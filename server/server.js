@@ -193,90 +193,90 @@ io.on('connection', (socket) => {
             currentPlayerName: currentPlayer.name,
             message: `게임이 시작되었습니다! ${currentPlayer.name}의 턴입니다!`
         });
+    });
+    
+    // 강제 게임 시작 (방장 전용)
+    socket.on('forceStartGame', () => {
+        const roomCode = socket.roomCode;
+        const room = rooms.get(roomCode);
         
-        // 강제 게임 시작 (방장 전용)
-        socket.on('forceStartGame', () => {
-            const roomCode = socket.roomCode;
-            const room = rooms.get(roomCode);
-            
-            console.log(`강제 게임 시작 요청: ${roomCode}`);
-            
-            if (!room || room.players.length < 2) {
-                socket.emit('gameError', { message: '최소 2명의 플레이어가 필요합니다.' });
-                return;
+        console.log(`강제 게임 시작 요청: ${roomCode}`);
+        
+        if (!room || room.players.length < 2) {
+            socket.emit('gameError', { message: '최소 2명의 플레이어가 필요합니다.' });
+            return;
+        }
+        
+        // 방장 권한 확인
+        const requestingPlayer = room.players.find(p => p.id === socket.id);
+        if (!requestingPlayer || !requestingPlayer.isHost) {
+            socket.emit('gameError', { message: '방장만 강제로 게임을 시작할 수 있습니다.' });
+            return;
+        }
+        
+        console.log(`방장 ${requestingPlayer.name}이 강제 게임 시작 요청`);
+        
+        // 베팅하지 않은 플레이어들에게 기본 베팅 설정
+        room.players.forEach(player => {
+            if (player.bet === 0) {
+                player.bet = 1000; // 기본 베팅 금액
+                console.log(`${player.name}에게 기본 베팅 1000 설정`);
             }
-            
-            // 방장 권한 확인
-            const requestingPlayer = room.players.find(p => p.id === socket.id);
-            if (!requestingPlayer || !requestingPlayer.isHost) {
-                socket.emit('gameError', { message: '방장만 강제로 게임을 시작할 수 있습니다.' });
-                return;
-            }
-            
-            console.log(`방장 ${requestingPlayer.name}이 강제 게임 시작 요청`);
-            
-            // 베팅하지 않은 플레이어들에게 기본 베팅 설정
-            room.players.forEach(player => {
-                if (player.bet === 0) {
-                    player.bet = 1000; // 기본 베팅 금액
-                    console.log(`${player.name}에게 기본 베팅 1000 설정`);
-                }
-            });
-            
-            // 게임 초기화
-            room.gameState = 'playing';
-            room.deck = createDeck();
-            room.dealerCards = [];
-            room.dealerScore = 0;
-            room.currentPlayerIndex = 0;
-            
-            console.log(`덱 생성 완료: ${room.deck.length}장의 카드`);
-            
-            // 모든 플레이어 초기화 (베팅 금액은 유지)
-            room.players.forEach(player => {
-                player.cards = [];
-                player.score = 0;
-            });
-            
-            // 카드 배분
-            dealInitialCards(room);
-            
-            // 첫 번째 플레이어 턴 시작
-            room.currentPlayerIndex = 0;
-            const currentPlayer = room.players[0];
-            
-            console.log(`강제 게임 시작 완료: ${roomCode}`);
-            console.log(`플레이어 카드:`, room.players.map(p => ({ name: p.name, cards: p.cards, score: p.score, bet: p.bet })));
-            console.log(`딜러 카드:`, room.dealerCards);
-            console.log(`현재 턴: ${currentPlayer.name} (${currentPlayer.id})`);
-            
-            // 게임 시작 이벤트와 함께 현재 턴 정보 전송
-            io.to(roomCode).emit('gameStarted', { 
-                room, 
-                currentPlayerId: currentPlayer.id,
-                currentPlayerName: currentPlayer.name,
-                message: `${currentPlayer.name}의 턴입니다! (강제 시작)`,
-                gameState: 'playing',
-                forceUpdate: true,
-                playerBets: room.players.map(p => ({ name: p.name, bet: p.bet })),
-                forceStarted: true
-            });
-            
-            // 즉시 턴 업데이트 이벤트 전송
-            io.to(roomCode).emit('turnUpdate', {
-                currentPlayerId: currentPlayer.id,
-                currentPlayerName: currentPlayer.name,
-                message: `${currentPlayer.name}의 턴입니다!`,
-                forceUpdate: true
-            });
-            
-            // 게임 상태 강제 업데이트
-            io.to(roomCode).emit('gameStateChanged', {
-                gameState: 'playing',
-                currentPlayerId: currentPlayer.id,
-                currentPlayerName: currentPlayer.name,
-                message: `게임이 강제로 시작되었습니다! ${currentPlayer.name}의 턴입니다!`
-            });
+        });
+        
+        // 게임 초기화
+        room.gameState = 'playing';
+        room.deck = createDeck();
+        room.dealerCards = [];
+        room.dealerScore = 0;
+        room.currentPlayerIndex = 0;
+        
+        console.log(`덱 생성 완료: ${room.deck.length}장의 카드`);
+        
+        // 모든 플레이어 초기화 (베팅 금액은 유지)
+        room.players.forEach(player => {
+            player.cards = [];
+            player.score = 0;
+        });
+        
+        // 카드 배분
+        dealInitialCards(room);
+        
+        // 첫 번째 플레이어 턴 시작
+        room.currentPlayerIndex = 0;
+        const currentPlayer = room.players[0];
+        
+        console.log(`강제 게임 시작 완료: ${roomCode}`);
+        console.log(`플레이어 카드:`, room.players.map(p => ({ name: p.name, cards: p.cards, score: p.score, bet: p.bet })));
+        console.log(`딜러 카드:`, room.dealerCards);
+        console.log(`현재 턴: ${currentPlayer.name} (${currentPlayer.id})`);
+        
+        // 게임 시작 이벤트와 함께 현재 턴 정보 전송
+        io.to(roomCode).emit('gameStarted', { 
+            room, 
+            currentPlayerId: currentPlayer.id,
+            currentPlayerName: currentPlayer.name,
+            message: `${currentPlayer.name}의 턴입니다! (강제 시작)`,
+            gameState: 'playing',
+            forceUpdate: true,
+            playerBets: room.players.map(p => ({ name: p.name, bet: p.bet })),
+            forceStarted: true
+        });
+        
+        // 즉시 턴 업데이트 이벤트 전송
+        io.to(roomCode).emit('turnUpdate', {
+            currentPlayerId: currentPlayer.id,
+            currentPlayerName: currentPlayer.name,
+            message: `${currentPlayer.name}의 턴입니다!`,
+            forceUpdate: true
+        });
+        
+        // 게임 상태 강제 업데이트
+        io.to(roomCode).emit('gameStateChanged', {
+            gameState: 'playing',
+            currentPlayerId: currentPlayer.id,
+            currentPlayerName: currentPlayer.name,
+            message: `게임이 강제로 시작되었습니다! ${currentPlayer.name}의 턴입니다!`
         });
     });
 

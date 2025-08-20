@@ -91,11 +91,12 @@ class RealTimeMultiplayerManager {
             this.showModal('베팅 완료', data.message);
         });
         
-        // 베팅 미완료 (방장에게 강제 시작 옵션 제공)
+        // 베팅 미완료 (방장은 바로 강제 시작 가능)
         this.socket.on('bettingIncomplete', (data) => {
             console.log('베팅 미완료:', data);
             if (data.canForceStart && this.isHost()) {
-                this.showForceStartOption(data);
+                // 방장은 바로 강제 시작
+                this.forceStartGame();
             } else {
                 this.showModal('베팅 미완료', data.message);
             }
@@ -150,9 +151,9 @@ class RealTimeMultiplayerManager {
             return;
         }
         
-        // 방장이 게임 시작 버튼을 누르면 자동으로 강제 시작 시도
-        console.log('방장이 게임 시작 요청');
-        this.socket.emit('startGame');
+        // 방장이 게임 시작 버튼을 누르면 바로 강제 시작
+        console.log('방장이 게임 시작 요청 - 강제 시작');
+        this.socket.emit('forceStartGame');
     }
 
     placeBet(amount) {
@@ -166,7 +167,7 @@ class RealTimeMultiplayerManager {
         
         const currentPlayer = this.room.players[this.room.currentPlayerIndex];
         if (currentPlayer.id !== this.playerId) {
-            this.showModal('턴 대기', '다른 플레이어의 턴을 기다려주세요.');
+            // 턴 대기 메시지 제거 - 조용히 무시
             return;
         }
         
@@ -178,7 +179,7 @@ class RealTimeMultiplayerManager {
         
         const currentPlayer = this.room.players[this.room.currentPlayerIndex];
         if (currentPlayer.id !== this.playerId) {
-            this.showModal('턴 대기', '다른 플레이어의 턴을 기다려주세요.');
+            // 턴 대기 메시지 제거 - 조용히 무시
             return;
         }
         
@@ -190,7 +191,7 @@ class RealTimeMultiplayerManager {
         
         const currentPlayer = this.room.players[this.room.currentPlayerIndex];
         if (currentPlayer.id !== this.playerId) {
-            this.showModal('턴 대기', '다른 플레이어의 턴을 기다려주세요.');
+            // 턴 대기 메시지 제거 - 조용히 무시
             return;
         }
         
@@ -351,14 +352,10 @@ class RealTimeMultiplayerManager {
         return player && player.isHost;
     }
     
-    // 강제 게임 시작 옵션 표시
+    // 강제 게임 시작 옵션 표시 (더 이상 사용하지 않음)
     showForceStartOption(data) {
-        const missingPlayers = data.missingPlayers.join(', ');
-        const message = `다음 플레이어들이 아직 베팅하지 않았습니다:\n${missingPlayers}\n\n강제로 게임을 시작하시겠습니까?\n(베팅하지 않은 플레이어는 기본 베팅 1000으로 설정됩니다)`;
-        
-        if (confirm(message)) {
-            this.forceStartGame();
-        }
+        // 방장은 바로 강제 시작하므로 이 함수는 사용하지 않음
+        this.forceStartGame();
     }
     
     // 강제 게임 시작
