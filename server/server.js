@@ -155,20 +155,30 @@ io.on('connection', (socket) => {
         console.log(`딜러 카드:`, room.dealerCards);
         console.log(`현재 턴: ${currentPlayer.name} (${currentPlayer.id})`);
         
-        // 게임 시작 이벤트와 함께 현재 턴 정보 전송
+        // 게임 시작 이벤트와 함께 현재 턴 정보 전송 (강력한 이벤트)
         io.to(roomCode).emit('gameStarted', { 
             room, 
             currentPlayerId: currentPlayer.id,
             currentPlayerName: currentPlayer.name,
             message: `${currentPlayer.name}의 턴입니다!`,
-            gameState: 'playing'
+            gameState: 'playing',
+            forceUpdate: true  // 강제 업데이트 플래그
         });
         
-        // 추가로 턴 업데이트 이벤트 전송
+        // 즉시 턴 업데이트 이벤트 전송
         io.to(roomCode).emit('turnUpdate', {
             currentPlayerId: currentPlayer.id,
             currentPlayerName: currentPlayer.name,
-            message: `${currentPlayer.name}의 턴입니다!`
+            message: `${currentPlayer.name}의 턴입니다!`,
+            forceUpdate: true
+        });
+        
+        // 게임 상태 강제 업데이트
+        io.to(roomCode).emit('gameStateChanged', {
+            gameState: 'playing',
+            currentPlayerId: currentPlayer.id,
+            currentPlayerName: currentPlayer.name,
+            message: `게임이 시작되었습니다! ${currentPlayer.name}의 턴입니다!`
         });
     });
 
