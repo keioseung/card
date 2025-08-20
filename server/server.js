@@ -18,8 +18,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../')));
 
-// 루트 경로 핸들러 (Railway 헬스체크용)
-app.get('/', (req, res) => {
+// 헬스체크용 경로 (Railway 헬스체크용)
+app.get('/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         message: 'Blackjack Game Server is running',
