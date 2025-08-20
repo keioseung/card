@@ -95,7 +95,8 @@ class RealTimeMultiplayerManager {
         this.socket.on('bettingIncomplete', (data) => {
             console.log('베팅 미완료:', data);
             if (data.canForceStart && this.isHost()) {
-                // 방장은 바로 강제 시작
+                // 방장은 바로 강제 시작 (확인 없이)
+                console.log('방장이 베팅 미완료 상태에서 바로 강제 시작');
                 this.forceStartGame();
             } else {
                 this.showModal('베팅 미완료', data.message);
@@ -151,8 +152,8 @@ class RealTimeMultiplayerManager {
             return;
         }
         
-        // 방장이 게임 시작 버튼을 누르면 바로 강제 시작
-        console.log('방장이 게임 시작 요청 - 강제 시작');
+        // 방장이 게임 시작 버튼을 누르면 바로 강제 시작 (확인 없이)
+        console.log('방장이 게임 시작 요청 - 즉시 강제 시작');
         this.socket.emit('forceStartGame');
     }
 
@@ -250,11 +251,11 @@ class RealTimeMultiplayerManager {
         // UI 업데이트
         this.updateGameDisplay();
         
-        // 턴 정보 표시
+        // 턴 정보 표시 (모달 제거)
         if (this.isMyTurn) {
-            this.showModal('게임 시작', `${data.currentPlayerName}의 턴입니다! (당신의 턴)`);
+            console.log(`${data.currentPlayerName}의 턴입니다! (당신의 턴)`);
         } else {
-            this.showModal('게임 시작', `${data.currentPlayerName}의 턴입니다!`);
+            console.log(`${data.currentPlayerName}의 턴입니다!`);
         }
         
         // 게임 진행 상태 업데이트
@@ -360,11 +361,8 @@ class RealTimeMultiplayerManager {
     
     // 강제 게임 시작
     forceStartGame() {
-        if (!this.isHost()) {
-            this.showModal('권한 없음', '방장만 강제로 게임을 시작할 수 있습니다.');
-            return;
-        }
-        
+        // 방장만 호출하므로 권한 체크 제거
+        console.log('강제 게임 시작 실행');
         this.socket.emit('forceStartGame');
     }
 
@@ -552,9 +550,9 @@ class BlackjackGame {
             return;
         }
 
-        // 멀티플레이어 모드 체크
+        // 멀티플레이어 모드 체크 (턴 대기 메시지 제거)
         if (this.isMultiplayerMode && !this.multiplayer.isMyTurn) {
-            this.showModal('턴 대기', '다른 플레이어의 턴을 기다려주세요.');
+            // 턴 대기 메시지 제거 - 조용히 무시
             return;
         }
 
