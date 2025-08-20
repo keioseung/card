@@ -90,6 +90,16 @@ class RealTimeMultiplayerManager {
             this.updateRoomDisplay();
             this.showModal('베팅 완료', data.message);
         });
+        
+        // 베팅 미완료 (방장에게 강제 시작 옵션 제공)
+        this.socket.on('bettingIncomplete', (data) => {
+            console.log('베팅 미완료:', data);
+            if (data.canForceStart && this.isHost()) {
+                this.showForceStartOption(data);
+            } else {
+                this.showModal('베팅 미완료', data.message);
+            }
+        });
 
         // 카드 뽑기
         this.socket.on('cardDrawn', (data) => {
@@ -140,6 +150,8 @@ class RealTimeMultiplayerManager {
             return;
         }
         
+        // 방장이 게임 시작 버튼을 누르면 자동으로 강제 시작 시도
+        console.log('방장이 게임 시작 요청');
         this.socket.emit('startGame');
     }
 
@@ -330,6 +342,33 @@ class RealTimeMultiplayerManager {
         if (bettingSection) {
             bettingSection.style.display = show ? 'block' : 'none';
         }
+    }
+    
+    // 방장 여부 확인
+    isHost() {
+        if (!this.room || !this.playerId) return false;
+        const player = this.room.players.find(p => p.id === this.playerId);
+        return player && player.isHost;
+    }
+    
+    // 강제 게임 시작 옵션 표시
+    showForceStartOption(data) {
+        const missingPlayers = data.missingPlayers.join(', ');
+        const message = `다음 플레이어들이 아직 베팅하지 않았습니다:\n${missingPlayers}\n\n강제로 게임을 시작하시겠습니까?\n(베팅하지 않은 플레이어는 기본 베팅 1000으로 설정됩니다)`;
+        
+        if (confirm(message)) {
+            this.forceStartGame();
+        }
+    }
+    
+    // 강제 게임 시작
+    forceStartGame() {
+        if (!this.isHost()) {
+            this.showModal('권한 없음', '방장만 강제로 게임을 시작할 수 있습니다.');
+            return;
+        }
+        
+        this.socket.emit('forceStartGame');
     }
 
     showGameResults(data) {
