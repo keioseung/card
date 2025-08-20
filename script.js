@@ -550,11 +550,10 @@ class BlackjackGame {
             return;
         }
 
-        // 멀티플레이어 모드 체크 (턴 대기 메시지 제거)
-        if (this.isMultiplayerMode && !this.multiplayer.isMyTurn) {
-            // 턴 대기 메시지 제거 - 조용히 무시
-            return;
-        }
+        // 멀티플레이어 모드 체크 (턴 대기 체크 완전 제거)
+        // if (this.isMultiplayerMode && !this.multiplayer.isMyTurn) {
+        //     return;
+        // }
 
         this.gameInProgress = true;
         this.dealerCards = [];
