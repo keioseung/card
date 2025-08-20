@@ -117,6 +117,16 @@ io.on('connection', (socket) => {
             return;
         }
         
+        // 방장 권한 확인
+        const requestingPlayer = room.players.find(p => p.id === socket.id);
+        if (!requestingPlayer || !requestingPlayer.isHost) {
+            console.log(`게임 시작 실패: 방장이 아닌 플레이어의 요청`);
+            socket.emit('gameError', { message: '방장만 게임을 시작할 수 있습니다.' });
+            return;
+        }
+        
+        console.log(`방장 ${requestingPlayer.name}이 게임 시작 요청`);
+        
         // 게임 초기화
         room.gameState = 'playing';
         room.deck = createDeck();
@@ -148,6 +158,14 @@ io.on('connection', (socket) => {
         // 게임 시작 이벤트와 함께 현재 턴 정보 전송
         io.to(roomCode).emit('gameStarted', { 
             room, 
+            currentPlayerId: currentPlayer.id,
+            currentPlayerName: currentPlayer.name,
+            message: `${currentPlayer.name}의 턴입니다!`,
+            gameState: 'playing'
+        });
+        
+        // 추가로 턴 업데이트 이벤트 전송
+        io.to(roomCode).emit('turnUpdate', {
             currentPlayerId: currentPlayer.id,
             currentPlayerName: currentPlayer.name,
             message: `${currentPlayer.name}의 턴입니다!`
