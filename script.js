@@ -48,8 +48,21 @@ class RealTimeMultiplayerManager {
 
         // 게임 시작
         this.socket.on('gameStarted', (data) => {
+            console.log('게임 시작 이벤트 수신:', data);
             this.room = data.room;
-            this.startRealTimeGame();
+            this.startRealTimeGame(data);
+        });
+        
+        // 턴 업데이트
+        this.socket.on('turnUpdate', (data) => {
+            console.log('턴 업데이트 이벤트 수신:', data);
+            this.handleTurnUpdate(data);
+        });
+        
+        // 게임 상태 변경
+        this.socket.on('gameStateChanged', (data) => {
+            console.log('게임 상태 변경 이벤트 수신:', data);
+            this.handleGameStateChange(data);
         });
 
         // 게임 에러
@@ -199,10 +212,81 @@ class RealTimeMultiplayerManager {
         if (doubleBtn) standBtn.disabled = !this.isMyTurn || this.room.players.length !== 2;
     }
 
-    startRealTimeGame() {
-        // 실시간 게임 시작 시 UI 업데이트
+    startRealTimeGame(data) {
+        console.log('실시간 게임 시작:', data);
+        
+        // 게임 상태 업데이트
+        this.room = data.room;
+        this.isMyTurn = (data.currentPlayerId === this.playerId);
+        
+        // UI 업데이트
         this.updateGameDisplay();
-        this.showModal('게임 시작', '실시간 멀티플레이어 게임이 시작되었습니다!');
+        
+        // 턴 정보 표시
+        if (this.isMyTurn) {
+            this.showModal('게임 시작', `${data.currentPlayerName}의 턴입니다! (당신의 턴)`);
+        } else {
+            this.showModal('게임 시작', `${data.currentPlayerName}의 턴입니다!`);
+        }
+        
+        // 게임 진행 상태 업데이트
+        this.updateGameProgress();
+    }
+    
+    handleTurnUpdate(data) {
+        console.log('턴 업데이트 처리:', data);
+        
+        // 현재 턴 플레이어 확인
+        this.isMyTurn = (data.currentPlayerId === this.playerId);
+        
+        // 턴 정보 업데이트
+        this.updateTurnDisplay(data);
+        
+        // 게임 진행 상태 업데이트
+        this.updateGameProgress();
+    }
+    
+    handleGameStateChange(data) {
+        console.log('게임 상태 변경 처리:', data);
+        
+        // 게임 상태 업데이트
+        if (data.gameState === 'playing') {
+            this.room.gameState = 'playing';
+            this.isMyTurn = (data.currentPlayerId === this.playerId);
+            
+            // UI 완전 새로고침
+            this.updateGameDisplay();
+            this.updateTurnDisplay(data);
+            this.updateGameProgress();
+        }
+    }
+    
+    updateTurnDisplay(data) {
+        // 턴 표시 업데이트
+        const turnInfo = document.getElementById('turnInfo');
+        if (turnInfo) {
+            if (this.isMyTurn) {
+                turnInfo.textContent = `당신의 턴입니다!`;
+                turnInfo.className = 'turn-info my-turn';
+            } else {
+                turnInfo.textContent = `${data.currentPlayerName}의 턴입니다!`;
+                turnInfo.className = 'turn-info other-turn';
+            }
+        }
+    }
+    
+    updateGameProgress() {
+        // 게임 진행 상태 업데이트
+        const gameStatus = document.getElementById('gameStatus');
+        if (gameStatus) {
+            if (this.room.gameState === 'playing') {
+                gameStatus.textContent = '게임 진행 중';
+                gameStatus.className = 'game-status playing';
+            } else {
+                gameStatus.textContent = '대기 중';
+                gameStatus.className = 'game-status waiting';
+            }
+        }
     }
 
     showGameResults(results) {
