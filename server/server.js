@@ -109,7 +109,10 @@ io.on('connection', (socket) => {
         const roomCode = socket.roomCode;
         const room = rooms.get(roomCode);
         
+        console.log(`게임 시작 요청: ${roomCode}, 플레이어 수: ${room?.players?.length}`);
+        
         if (!room || room.players.length < 2) {
+            console.log(`게임 시작 실패: 방이 없거나 플레이어 부족`);
             socket.emit('gameError', { message: '최소 2명의 플레이어가 필요합니다.' });
             return;
         }
@@ -121,6 +124,8 @@ io.on('connection', (socket) => {
         room.dealerScore = 0;
         room.currentPlayerIndex = 0;
         
+        console.log(`덱 생성 완료: ${room.deck.length}장의 카드`);
+        
         // 모든 플레이어 초기화
         room.players.forEach(player => {
             player.cards = [];
@@ -131,8 +136,22 @@ io.on('connection', (socket) => {
         // 카드 배분
         dealInitialCards(room);
         
-        console.log(`게임 시작: ${roomCode}`);
-        io.to(roomCode).emit('gameStarted', { room });
+        // 첫 번째 플레이어 턴 시작
+        room.currentPlayerIndex = 0;
+        const currentPlayer = room.players[0];
+        
+        console.log(`게임 시작 완료: ${roomCode}`);
+        console.log(`플레이어 카드:`, room.players.map(p => ({ name: p.name, cards: p.cards, score: p.score })));
+        console.log(`딜러 카드:`, room.dealerCards);
+        console.log(`현재 턴: ${currentPlayer.name} (${currentPlayer.id})`);
+        
+        // 게임 시작 이벤트와 함께 현재 턴 정보 전송
+        io.to(roomCode).emit('gameStarted', { 
+            room, 
+            currentPlayerId: currentPlayer.id,
+            currentPlayerName: currentPlayer.name,
+            message: `${currentPlayer.name}의 턴입니다!`
+        });
     });
 
     // 베팅
