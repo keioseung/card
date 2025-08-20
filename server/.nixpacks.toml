@@ -2,7 +2,10 @@
 nixPkgs = ["nodejs_18", "npm"]
 
 [phases.install]
-cmds = ["npm ci --only=production"]
+cmds = [
+  "rm -rf node_modules/.cache",
+  "npm install --omit=dev --prefer-offline --no-audit"
+]
 
 [phases.build]
 cmds = ["echo 'Build phase completed'"]
