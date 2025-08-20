@@ -72,8 +72,23 @@ class RealTimeMultiplayerManager {
 
         // 베팅 완료
         this.socket.on('betPlaced', (data) => {
+            console.log('베팅 완료 이벤트:', data);
             this.room = data.room;
             this.updateRoomDisplay();
+            this.showBettingInfo(data);
+        });
+        
+        // 베팅 에러
+        this.socket.on('betError', (data) => {
+            this.showModal('베팅 오류', data.message);
+        });
+        
+        // 모든 플레이어 베팅 완료
+        this.socket.on('allPlayersBet', (data) => {
+            console.log('모든 플레이어 베팅 완료:', data);
+            this.room = data.room;
+            this.updateRoomDisplay();
+            this.showModal('베팅 완료', data.message);
         });
 
         // 카드 뽑기
@@ -282,21 +297,98 @@ class RealTimeMultiplayerManager {
             if (this.room.gameState === 'playing') {
                 gameStatus.textContent = '게임 진행 중';
                 gameStatus.className = 'game-status playing';
+            } else if (this.room.gameState === 'readyToStart') {
+                gameStatus.textContent = '게임 시작 준비 완료';
+                gameStatus.className = 'game-status ready';
             } else {
                 gameStatus.textContent = '대기 중';
                 gameStatus.className = 'game-status waiting';
             }
         }
     }
+    
+    showBettingInfo(data) {
+        // 베팅 정보 표시
+        const bettingInfo = document.getElementById('bettingInfo');
+        if (bettingInfo) {
+            bettingInfo.innerHTML = `
+                <div class="betting-notification">
+                    <strong>${data.playerName}</strong>님이 <strong>${data.amount}</strong> 베팅했습니다.
+                </div>
+            `;
+            
+            // 3초 후 자동으로 숨기기
+            setTimeout(() => {
+                bettingInfo.innerHTML = '';
+            }, 3000);
+        }
+    }
+    
+    // 베팅 UI 표시/숨기기
+    toggleBettingUI(show) {
+        const bettingSection = document.getElementById('bettingSection');
+        if (bettingSection) {
+            bettingSection.style.display = show ? 'block' : 'none';
+        }
+    }
 
-    showGameResults(results) {
-        let resultText = '게임 결과:\n';
+    showGameResults(data) {
+        const { results, gameStats } = data;
+        
+        let resultText = '🎮 게임 결과 🎮\n\n';
+        
+        // 각 플레이어 결과
         results.forEach(result => {
-            const player = this.room.players.find(p => p.id === result.playerId);
-            resultText += `${player.name}: ${result.result} (${result.score}점)\n`;
+            const emoji = result.result === 'win' ? '🎉' : 
+                         result.result === 'tie' ? '🤝' : '💔';
+            resultText += `${emoji} ${result.playerName}: ${result.result.toUpperCase()}\n`;
+            resultText += `   점수: ${result.score} vs 딜러 ${result.dealerScore}\n`;
+            resultText += `   베팅: ${result.bet}, 상금: ${result.winnings}\n`;
+            resultText += `   사유: ${result.reason}\n\n`;
         });
         
+        // 게임 통계
+        if (gameStats) {
+            resultText += `📊 게임 통계 📊\n`;
+            resultText += `총 베팅: ${gameStats.totalBets}\n`;
+            resultText += `총 상금: ${gameStats.totalWinnings}\n`;
+            resultText += `딜러 최종 점수: ${gameStats.dealerScore}\n`;
+        }
+        
         this.showModal('게임 종료', resultText);
+        
+        // 게임 결과를 화면에 표시
+        this.displayGameResults(data);
+    }
+    
+    displayGameResults(data) {
+        const resultsContainer = document.getElementById('gameResults');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = `
+                <div class="game-results">
+                    <h3>🎮 게임 결과</h3>
+                    ${data.results.map(result => `
+                        <div class="player-result ${result.result}">
+                            <div class="player-name">${result.playerName}</div>
+                            <div class="result-details">
+                                <span class="result">${result.result.toUpperCase()}</span>
+                                <span class="score">${result.score} vs ${result.dealerScore}</span>
+                                <span class="betting">베팅: ${result.bet} | 상금: ${result.winnings}</span>
+                                <span class="reason">${result.reason}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                    ${data.gameStats ? `
+                        <div class="game-stats">
+                            <h4>📊 게임 통계</h4>
+                            <p>총 베팅: ${data.gameStats.totalBets}</p>
+                            <p>총 상금: ${data.gameStats.totalWinnings}</p>
+                            <p>딜러 점수: ${data.gameStats.dealerScore}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
     }
 
     showModal(title, message) {

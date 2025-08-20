@@ -125,6 +125,13 @@ io.on('connection', (socket) => {
             return;
         }
         
+        // 베팅 완료 확인
+        const allPlayersBet = room.players.every(p => p.bet > 0);
+        if (!allPlayersBet) {
+            socket.emit('gameError', { message: '모든 플레이어가 베팅을 완료해야 합니다.' });
+            return;
+        }
+        
         console.log(`방장 ${requestingPlayer.name}이 게임 시작 요청`);
         
         // 게임 초기화
@@ -136,11 +143,11 @@ io.on('connection', (socket) => {
         
         console.log(`덱 생성 완료: ${room.deck.length}장의 카드`);
         
-        // 모든 플레이어 초기화
+        // 모든 플레이어 초기화 (베팅 금액은 유지)
         room.players.forEach(player => {
             player.cards = [];
             player.score = 0;
-            player.bet = 0;
+            // player.bet은 유지 (베팅 금액)
         });
         
         // 카드 배분
@@ -151,7 +158,7 @@ io.on('connection', (socket) => {
         const currentPlayer = room.players[0];
         
         console.log(`게임 시작 완료: ${roomCode}`);
-        console.log(`플레이어 카드:`, room.players.map(p => ({ name: p.name, cards: p.cards, score: p.score })));
+        console.log(`플레이어 카드:`, room.players.map(p => ({ name: p.name, cards: p.cards, score: p.score, bet: p.bet })));
         console.log(`딜러 카드:`, room.dealerCards);
         console.log(`현재 턴: ${currentPlayer.name} (${currentPlayer.id})`);
         
@@ -162,7 +169,8 @@ io.on('connection', (socket) => {
             currentPlayerName: currentPlayer.name,
             message: `${currentPlayer.name}의 턴입니다!`,
             gameState: 'playing',
-            forceUpdate: true  // 강제 업데이트 플래그
+            forceUpdate: true,  // 강제 업데이트 플래그
+            playerBets: room.players.map(p => ({ name: p.name, bet: p.bet }))
         });
         
         // 즉시 턴 업데이트 이벤트 전송
@@ -188,14 +196,43 @@ io.on('connection', (socket) => {
         const roomCode = socket.roomCode;
         const room = rooms.get(roomCode);
         
-        if (!room || room.gameState !== 'playing') return;
+        if (!room || room.gameState !== 'waiting') {
+            socket.emit('betError', { message: '게임이 시작되기 전에만 베팅할 수 있습니다.' });
+            return;
+        }
         
         const player = room.players.find(p => p.id === socket.id);
         if (player) {
+            // 베팅 금액 검증
+            if (amount < 100 || amount > 10000) {
+                socket.emit('betError', { message: '베팅 금액은 100~10000 사이여야 합니다.' });
+                return;
+            }
+            
             player.bet = amount;
             room.currentBet = amount;
             
-            io.to(roomCode).emit('betPlaced', { room, playerId: socket.id, amount });
+            console.log(`${player.name}이 ${amount} 베팅`);
+            
+            // 모든 플레이어에게 베팅 정보 전송
+            io.to(roomCode).emit('betPlaced', { 
+                room, 
+                playerId: socket.id, 
+                playerName: player.name,
+                amount,
+                message: `${player.name}이 ${amount} 베팅했습니다.`
+            });
+            
+            // 모든 플레이어가 베팅했는지 확인
+            const allPlayersBet = room.players.every(p => p.bet > 0);
+            if (allPlayersBet && room.players.length >= 2) {
+                // 자동으로 게임 시작 가능 상태로 변경
+                room.gameState = 'readyToStart';
+                io.to(roomCode).emit('allPlayersBet', { 
+                    room, 
+                    message: '모든 플레이어가 베팅을 완료했습니다. 방장이 게임을 시작할 수 있습니다.' 
+                });
+            }
         }
     });
 
@@ -389,34 +426,65 @@ function playDealerTurn(room) {
 function endGame(room) {
     room.gameState = 'finished';
     
+    console.log(`게임 종료: ${room.id}`);
+    console.log(`딜러 최종 점수: ${room.dealerScore}`);
+    
     // 승자 결정 및 상금 계산
     const results = room.players.map(player => {
         let result = 'lose';
         let winnings = 0;
+        let reason = '';
         
         if (player.score > 21) {
             result = 'bust';
+            reason = '21점 초과';
         } else if (room.dealerScore > 21) {
             result = 'win';
             winnings = player.bet * 2;
+            reason = '딜러 버스트';
         } else if (player.score > room.dealerScore) {
             result = 'win';
             winnings = player.bet * 2;
+            reason = '딜러보다 높은 점수';
         } else if (player.score === room.dealerScore) {
             result = 'tie';
             winnings = player.bet;
+            reason = '딜러와 동점';
+        } else {
+            reason = '딜러보다 낮은 점수';
         }
+        
+        console.log(`${player.name}: ${result} (${player.score} vs ${room.dealerScore}) - ${reason}`);
         
         return {
             playerId: player.id,
+            playerName: player.name,
             result,
             winnings,
             score: player.score,
-            dealerScore: room.dealerScore
+            dealerScore: room.dealerScore,
+            bet: player.bet,
+            reason
         };
     });
     
-    io.to(room.id).emit('gameEnded', { room, results });
+    // 게임 통계 계산
+    const totalBets = room.players.reduce((sum, p) => sum + p.bet, 0);
+    const totalWinnings = results.reduce((sum, r) => sum + r.winnings, 0);
+    const houseProfit = totalBets - totalWinnings;
+    
+    console.log(`총 베팅: ${totalBets}, 총 상금: ${totalWinnings}, 하우스 수익: ${houseProfit}`);
+    
+    io.to(room.id).emit('gameEnded', { 
+        room, 
+        results, 
+        gameStats: {
+            totalBets,
+            totalWinnings,
+            houseProfit,
+            dealerScore: room.dealerScore
+        }
+    });
 }
 
 // 서버 시작
